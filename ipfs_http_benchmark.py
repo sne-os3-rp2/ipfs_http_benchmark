@@ -130,7 +130,7 @@ for i in range(2, count+1):
     else:
         exit("Unexpected output")
 
-
+# TODO Add a final step that check in all the node that the file was indeed transfered and of the right size
 
 info('*** Benchmark completed. You can now exit and check generated output.csv\n')
 
