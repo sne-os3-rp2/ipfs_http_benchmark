@@ -8,6 +8,14 @@ To use this tool containernet needs to be installed. Follow the installation ins
 
 Once installed, copy `ipfs_http_benchmark.py` into the required directory within containernet where it can be run.
 
+Before running the benchmark build the docker image that is used in the benchmark by cd'ing into `ubuntu-ipfs-docker` and run:
+
+```
+sudo docker build -t ubuntu-ipfs .
+```
+
+Ensure the image is tagged as `ubuntu-ipfs` as this is what is used within containernet
+
 An example of how to run the bechmark is to run the following command:
 
 ```
