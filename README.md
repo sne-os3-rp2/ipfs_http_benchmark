@@ -1,3 +1,7 @@
+### TODO
+- Add a check after the data transfer to check that data indeed was downloaded to requesting nodes and is of the expected size
+- the `.cmd` method _seems_ to behave in unpredicatable manner sometimes regarding the output. Try and identify the method to its maddness.
+
 ### IPFS/HTTP Benchmark
 
 #### Overview
