@@ -1,3 +1,7 @@
+### TODO
+- Add a check after the data transfer to check that data indeed was downloaded to requesting nodes and is of the expected size
+- the `.cmd` method _seems_ to behave in unpredicatable manner sometimes regarding the output. Try and identify the method to its maddness.
+
 ### IPFS/HTTP Benchmark
 
 #### Overview
@@ -7,6 +11,14 @@ Tool for performing data transfer benchmark of IPFS and HTTP within Mininet (via
 To use this tool containernet needs to be installed. Follow the installation instructions of containernet [here](https://containernet.github.io/#installation)
 
 Once installed, copy `ipfs_http_benchmark.py` into the required directory within containernet where it can be run.
+
+Before running the benchmark build the docker image that is used in the benchmark by cd'ing into `ubuntu-ipfs-docker` and run:
+
+```
+sudo docker build -t ubuntu-ipfs .
+```
+
+Ensure the image is tagged as `ubuntu-ipfs` as this is what is used within containernet
 
 An example of how to run the bechmark is to run the following command:
 
