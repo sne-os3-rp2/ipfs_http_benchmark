@@ -59,15 +59,15 @@ for i in range(1, count+1):
             info('*** Installing nginx on d1\n')
             net[d_node].cmd('sudo /etc/init.d/nginx start')
             # generating data on http server
-            info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt  \n')
+            info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt for HTTP \n')
             net[d_node].cmd(f'sudo truncate -s {file_size} /usr/share/nginx/html/data.txt')
 
             #net.addLink(net[d_node], s2, cls=TCLink)
        elif (t_type == "ipfs"): # Configure IPFS "server". File origin.
             # generating data on first ipfs node
-            info(f'*** Generating file of size {file_size} at /tmp/data.txt  \n')
-            net[d_node].cmd(f'sudo truncate -s {file_size} /tmp/data.txt')
-            net[d_node].cmd(f'sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count=128000')
+            info(f'*** Generating file of size {file_size} at /tmp/data.txt for IPFS  \n')
+            resu=net[d_node].cmd(f'time sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count=12800')
+            info(f'{resu} TIM TIME TIME\n')
        else:
             print("unexpected experiment type")
     else:
@@ -106,7 +106,7 @@ if (t_type == "ipfs"):
 f = open("output.csv", "w")
 f.write("'node','type','filesize','real','user','sys'\n")
 
-time.sleep(5)
+time.sleep(30)
 # perform retrieval
 def run_ipfs():
 
