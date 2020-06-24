@@ -12,14 +12,15 @@ setLogLevel('info')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--count", help="Number of nodes", default=1)
-parser.add_argument("-s", "--size", help="filesize", default="10M")
-parser.add_argument("-d", "--delay", help="delay between nodes and switch", default="500ms")
-parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and switch", default=1)
+parser.add_argument("-s", "--size", help="filesize in MiB; e.g. 10", default="10")
+parser.add_argument("-d", "--delay", help="delay between nodes and switch", default="50ms")
+parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and switch", default=1000)
 parser.add_argument("-t", "--type", help="type of benchmark to run", default="http")
-parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="1500ms")
+parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="150ms")
 args = parser.parse_args()
 count = int(args.count)
-file_size = args.size
+file_size = int(args.size) * 256 # Convert MiB to chunks of 4096 bytes
+info(f'file size = {file_size}\n args.size = {args.size} \n')
 delay = args.delay #General delay between all hosts
 delay_server = args.delayserver 
 bw = int(args.bandwidth)
@@ -41,14 +42,16 @@ s1 = net.addSwitch('s1')
 docks = []
 for i in range(1, count+1):
     d_node = f'd{i}'
+    bootnode = True if i == 1 else False
 
     info(f'*** Adding container {d_node}.\n')
-    docks.append(net.addDocker(d_node, ip=f'192.168.1.{i}/24', dimage="ubuntu-ipfs", ports=[80], mem_limit="1g"))
+    docks.append(net.addDocker(d_node, ip=f'192.168.1.{i}/24', dimage="ubuntu-ipfs", ports=[80], #mem_limit="1g",
+        environment={
+            "ENV_SWARM_KEY":"09b7fe038a241d5e38650b0f1811933644d6195814f863902d44698fa38b8cfa",
+            "BOOTNODE_IP":"192.168.1.1",
+            "IS_BOOTNODE":bootnode
+            }))
 
-    #if (i % 2) == 0:
-    #    info(f'*** Linking node {d_node} to switch {s1}  \n')
-    #    net.addLink(s1, net[d_node], cls=TCLink)
-    #else:
     if (i == 1):
        # linking node hosting download data to switch
        info(f'*** Linking node hosting download data (d1) to switch with delay of {delay} and bandwidth of {bw} \n')
@@ -60,14 +63,13 @@ for i in range(1, count+1):
             net[d_node].cmd('sudo /etc/init.d/nginx start')
             # generating data on http server
             info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt for HTTP \n')
-            net[d_node].cmd(f'sudo truncate -s {file_size} /usr/share/nginx/html/data.txt')
+            net[d_node].cmd(f'sudo dd if=/dev/urandom of=/usr/share/nginx/html/data.txt bs=4096 count={file_size}')
 
             #net.addLink(net[d_node], s2, cls=TCLink)
        elif (t_type == "ipfs"): # Configure IPFS "server". File origin.
             # generating data on first ipfs node
             info(f'*** Generating file of size {file_size} at /tmp/data.txt for IPFS  \n')
-            resu=net[d_node].cmd(f'time sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count=12800')
-            info(f'{resu} TIM TIME TIME\n')
+            net[d_node].cmd(f'sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count={file_size}')
        else:
             print("unexpected experiment type")
     else:
@@ -77,36 +79,43 @@ for i in range(1, count+1):
 info('*** Starting network\n')
 net.start()
 
-cid = ''
-# do the ipfs thing
-if (t_type == "ipfs"):
-  for i in range(1, count+1):
-      d_node = f'd{i}'
-      print(f"running on {d_node}")
-#      net[d_node].cmd(f'export IPFS_PATH=/tmp/{d_node}')
 
-      net[d_node].cmd('ipfs init --profile=badgerds')
-      if d_node == 'd1':
-         info('*** Adding generated data to ipfs\n') 
-         cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
-         print(f"*** CID of data is {cid}")
-         info(f'*** Starting ipfs for node d1\n')
-         docks[i-1].start()
-         #start_result = net[d_node].cmd('sudo ipfs daemon --migrate=true &')
-         print("result of starting ipfs command")
-         #print(start_result)
-      else:
-         info(f'*** Starting ipfs for node {d_node}\n') 
-         docks[i-1].start()
-         #start_result = net[d_node].cmd('sudo ipfs daemon --migrate=true &')
-         print("result of starting ipfs command")
-         #print(start_result)
+cid = None
+peerid = None
+# Configure and boot IPFS nodes
+if (t_type == "ipfs"):
+    for i in range(1, count+1):
+        d_node = f'd{i}'
+        print(f"running on {d_node}")
+        
+        net[d_node].cmd('ipfs init --profile=badgerds')
+
+        if d_node == 'd1':
+           time.sleep(2)
+           info('*** Adding generated data to ipfs\n')
+           garbo = net[d_node].cmd('echo "ravioli"')
+           cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
+           print(f"*** CID of data is {cid}")
+
+           peerid = net[d_node].cmd('ipfs id -f "<id>"')
+        
+        # Change bootstrap node:
+        #net[d_node].cmd('ipfs shutdown')
+        net[d_node].cmd('ipfs bootstrap rm --all')
+        interm = net[d_node].cmd(f'ipfs bootstrap add /ip4/192.168.1.1/tcp/4001/p2p/{peerid}')
+        info(f'*** bootstrap command result: {interm}')
+        net[d_node].cmd(f'echo "/key/swarm/psk/1.0.0/\n/base16/" > ~/.ipfs/swarm.key')
+        net[d_node].cmd(f'echo $ENV_SWARM_KEY >> ~/.ipfs/swarm.key')
+        info(f'*** PEERID after boot {peerid}')
+
+        docks[i-1].start()
+        time.sleep(2)
 
 
 f = open("output.csv", "w")
-f.write("'node','type','filesize','real','user','sys'\n")
+f.write("'node','type','filesize','server_delay','delay','bandwidth','real','user','sys'\n")
 
-time.sleep(30)
+time.sleep(10)
 # perform retrieval
 def run_ipfs():
 
@@ -126,7 +135,7 @@ def run_ipfs():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"{d_node},'ipfs','{file_size}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','http','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
 
 
 def run_http():
@@ -146,7 +155,7 @@ def run_http():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"d{i},'http','{file_size}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','http','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
 
 if (t_type == "http"):
     info('*** Starting HTTP benchmark run')
@@ -158,9 +167,9 @@ else:
     exit("wrong experiment type")
 
 
-info('*** Running CLI\n')
+#info('*** Running CLI\n')
+#CLI(net)
+info('*** Finished tests!')
+info('*** Stopping network')
 
-CLI(net)
-#info('*** Stopping network')
-
-#net.stop()
+net.stop()
