@@ -114,7 +114,7 @@ if (t_type == "ipfs"):
 
 f = open("output.csv", "w")
 f.write("'node','type','filesize','server_delay','delay','bandwidth','real','user','sys'\n")
-
+CLI(net)
 time.sleep(10)
 # perform retrieval
 def run_ipfs():
@@ -135,7 +135,7 @@ def run_ipfs():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','http','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','ipfs','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
 
 
 def run_http():
