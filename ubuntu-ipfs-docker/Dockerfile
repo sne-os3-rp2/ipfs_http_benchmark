@@ -9,6 +9,11 @@ RUN apt-get update
 RUN apt-get install --assume-yes wget
 RUN apt-get install --assume-yes nginx
 
+# Copy Nginx certificates after installation
+COPY ./self_cert/ /etc/ssl/
+COPY default /etc/nginx/sites-enabled/default
+#TODO: generate/edit nginx config
+
 # Expose ports
 # Swarm TCP; should be exposed to the public
 EXPOSE 4001
