@@ -121,7 +121,7 @@ if (t_type == "ipfs"):
         # Change bootstrap node:
         #net[d_node].cmd('ipfs shutdown')
         net[d_node].cmd('ipfs bootstrap rm --all')
-        time.sleep(1)
+        time.sleep(3)
         garbolo = net[d_node].cmd('echo "fermioli"') # used to filter out stdout from verbose errors
         interm = net[d_node].cmd(f'ipfs bootstrap add /ip4/192.168.1.1/tcp/4001/p2p/{peerid}')
         info(f'*** bootstrap command result: {interm}')
