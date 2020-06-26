@@ -7,6 +7,7 @@ from mininet.log import info, setLogLevel
 import argparse
 import subprocess
 import time
+import datetime
 
 setLogLevel('info')
 
@@ -17,6 +18,7 @@ parser.add_argument("-d", "--delay", help="delay between nodes and switch", defa
 parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and switch", default=1000)
 parser.add_argument("-t", "--type", help="type of benchmark to run", default="https")
 parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="150ms")
+parser.add_argument("-n", "--naptime", help="Sleep time before test start. (may influence results)", default="10")
 args = parser.parse_args()
 count = int(args.count)
 file_size = int(args.size) * 256 # Convert MiB to chunks of 4096 bytes
@@ -24,6 +26,7 @@ delay = args.delay #General delay between all hosts
 delay_server = args.delayserver 
 bw = int(args.bandwidth)
 t_type = args.type 
+naptime = int(args.naptime)
 
 
 net = Containernet(controller=Controller)
@@ -101,6 +104,7 @@ if (t_type == "ipfs"):
         # Change bootstrap node:
         #net[d_node].cmd('ipfs shutdown')
         net[d_node].cmd('ipfs bootstrap rm --all')
+        time.sleep(1)
         garbolo = net[d_node].cmd('echo "fermioli"') # used to filter out stdout from verbose errors
         interm = net[d_node].cmd(f'ipfs bootstrap add /ip4/192.168.1.1/tcp/4001/p2p/{peerid}')
         info(f'*** bootstrap command result: {interm}')
@@ -111,10 +115,13 @@ if (t_type == "ipfs"):
         docks[i-1].start()
         time.sleep(2)
 
+tadedime = datetime.datetime.now().strftime('%Y%b%d-%H:%M')
+f = open(f'./results/{tadedime}-{t_type}-{int(args.size)}.csv', "w")
+f.write("'node','type','filesize','server_delay','delay','bandwidth','sleep','real','user','sys'\n")
 
-f = open("output.csv", "w")
-f.write("'node','type','filesize','server_delay','delay','bandwidth','real','user','sys'\n")
-time.sleep(10)
+### Sleep before tests.
+time.sleep(naptime)
+
 # perform retrieval
 def run_ipfs():
 
@@ -134,7 +141,7 @@ def run_ipfs():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','ipfs','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','ipfs','{int(args.size)}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
 
 
 def run_http():
@@ -154,7 +161,7 @@ def run_http():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','https','{int(args.size)}','{delay_server}','{delay}','{bw}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','https','{int(args.size)}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
 
 if (t_type == "https"):
     info('*** Starting HTTPS benchmark run')
@@ -167,7 +174,7 @@ else:
 
 
 #info('*** Running CLI\n')
-CLI(net)
+#CLI(net)
 info('*** Finished tests!')
 info('*** Stopping network')
 
