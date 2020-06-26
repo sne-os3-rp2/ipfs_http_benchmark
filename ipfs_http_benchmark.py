@@ -19,15 +19,16 @@ parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and s
 parser.add_argument("-t", "--type", help="type of benchmark to run", default="https")
 parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="150ms")
 parser.add_argument("-n", "--naptime", help="Sleep time before test start. (may influence results)", default="10")
+parser.add_argument("-cf", --"file_count"  help="Number of files to create. Size of each file is specified by -s flag", default="10")
 args = parser.parse_args()
 count = int(args.count)
 file_size = int(args.size) * 256 # Convert MiB to chunks of 4096 bytes
 delay = args.delay #General delay between all hosts
-delay_server = args.delayserver 
+delay_server = args.delayserver
 bw = int(args.bandwidth)
-t_type = args.type 
+t_type = args.type
 naptime = int(args.naptime)
-
+file_count = int(arg.file_count)
 
 net = Containernet(controller=Controller)
 
@@ -40,6 +41,16 @@ s1 = net.addSwitch('s1')
 #s2 = net.addSwitch('s2')
 
 #net.addLink(s1, s2, cls=TCLink, delay='1500ms', bw=2)
+
+http_dir_location = "/usr/share/nginx/html/"
+ipfs_dir_location = "/tmp/"
+peerid = None #peerid of publishing node
+
+def generate_dir(file_size, count, node, location):
+    for i in range(1, count + 1):
+        node.cmd(f'sudo dd if=/dev/urandom of={location}/{count}.txt bs=4096 count={file_size}')
+
+
 
 docks = []
 for i in range(1, count+1):
@@ -65,13 +76,17 @@ for i in range(1, count+1):
             net[d_node].cmd('sudo /etc/init.d/nginx start')
             # generating data on http server
             info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt for HTTPS \n')
-            net[d_node].cmd(f'sudo dd if=/dev/urandom of=/usr/share/nginx/html/data.txt bs=4096 count={file_size}')
+
+            generate_data(file_size, file_count, net[d_node], http_dir_location)
+
+            #net[d_node].cmd(f'sudo dd if=/dev/urandom of=/usr/share/nginx/html/data.txt bs=4096 count={file_size}')
 
             #net.addLink(net[d_node], s2, cls=TCLink)
        elif (t_type == "ipfs"): # Configure IPFS "server". File origin.
             # generating data on first ipfs node
             info(f'*** Generating file of size {file_size} at /tmp/data.txt for IPFS  \n')
-            net[d_node].cmd(f'sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count={file_size}')
+            generate_data(file_size, file_count, net[d_node], ipfs_dir_location)
+            # net[d_node].cmd(f'sudo dd if=/dev/urandom of=/tmp/data.txt bs=4096 count={file_size}')
        else:
             print("unexpected experiment type")
     else:
@@ -89,18 +104,22 @@ if (t_type == "ipfs"):
     for i in range(1, count+1):
         d_node = f'd{i}'
         print(f"running on {d_node}")
-        
+
         net[d_node].cmd('ipfs init --profile=badgerds')
 
         if d_node == 'd1':
            time.sleep(2)
            info('*** Adding generated data to ipfs\n')
            garbo = net[d_node].cmd('echo "ravioli"') # "flush" stdout on host
-           cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
+           #cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
+           cid = net[d_node].cmd(f'ipfs add -Q -r {ipfs_dir_location}').rstrip()
+
            print(f"*** CID of data is {cid}")
 
            peerid = net[d_node].cmd('ipfs id -f "<id>"')
-        
+
+           net[d_node].cmd(f'ipfs name publish {cid}')
+
         # Change bootstrap node:
         #net[d_node].cmd('ipfs shutdown')
         net[d_node].cmd('ipfs bootstrap rm --all')
@@ -129,11 +148,12 @@ def run_ipfs():
       d_node = f'd{i}'
 
 
-      result = net[d_node].cmd(f'time -p ipfs get {cid} --output=/tmp/ipfs/data.txt; sync')
+      #result = net[d_node].cmd(f'time -p ipfs get {cid} --output=/tmp/ipfs/data.txt; sync')
+      result = net[d_node].cmd(f'time -p ipfs get /ipns/{peerid} --output=/tmp/ipfs/; sync')
       info(f'*** Finished data retrieval via ipfs on node {d_node} \n')
 
       print(result)
-      
+
       splitted = result.split('\n')
       print(splitted)
       length = len(splitted)
@@ -147,13 +167,13 @@ def run_ipfs():
 def run_http():
 
   for i in range(2, count+1):
-    
+
       d_node = f'd{i}'
-    
+
       result = net[d_node].cmd(f"time -p wget --ca-certificate=/etc/ssl/issuer.crt -q https://192.168.1.1/data.txt -P /tmp/http/data.txt; sync")
       time.sleep(2)
       info(f'*** Finished data retrieval via http on node {d_node} \n')
-    
+
       splitted = result.split('\n')
       print(splitted)
 
