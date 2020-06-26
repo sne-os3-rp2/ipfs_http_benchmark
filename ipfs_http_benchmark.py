@@ -19,7 +19,7 @@ parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and s
 parser.add_argument("-t", "--type", help="type of benchmark to run", default="https")
 parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="150ms")
 parser.add_argument("-n", "--naptime", help="Sleep time before test start. (may influence results)", default="10")
-parser.add_argument("-cf", --"file_count"  help="Number of files to create. Size of each file is specified by -s flag", default="10")
+parser.add_argument("-cf", "--file_count",  help="Number of files to create. Size of each file is specified by -s flag", default="10")
 args = parser.parse_args()
 count = int(args.count)
 file_size = int(args.size) * 256 # Convert MiB to chunks of 4096 bytes
@@ -28,7 +28,7 @@ delay_server = args.delayserver
 bw = int(args.bandwidth)
 t_type = args.type
 naptime = int(args.naptime)
-file_count = int(arg.file_count)
+file_count = int(args.file_count)
 
 net = Containernet(controller=Controller)
 
@@ -43,12 +43,12 @@ s1 = net.addSwitch('s1')
 #net.addLink(s1, s2, cls=TCLink, delay='1500ms', bw=2)
 
 http_dir_location = "/usr/share/nginx/html/"
-ipfs_dir_location = "/tmp/"
+ipfs_dir_location = "/tmp/upload/"
 peerid = None #peerid of publishing node
 
-def generate_dir(file_size, count, node, location):
+def generate_data(file_size, count, node, location):
     for i in range(1, count + 1):
-        node.cmd(f'sudo dd if=/dev/urandom of={location}/{count}.txt bs=4096 count={file_size}')
+        node.cmd(f'sudo dd if=/dev/urandom of={location}/{i}.txt bs=4096 count={file_size}')
 
 
 
@@ -75,7 +75,7 @@ for i in range(1, count+1):
             info('*** Installing nginx on d1\n')
             net[d_node].cmd('sudo /etc/init.d/nginx start')
             # generating data on http server
-            info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt for HTTPS \n')
+            #info(f'*** Generating file of size {file_size} at /usr/share/nginx/html/data.txt for HTTPS \n')
 
             generate_data(file_size, file_count, net[d_node], http_dir_location)
 
@@ -118,8 +118,6 @@ if (t_type == "ipfs"):
 
            peerid = net[d_node].cmd('ipfs id -f "<id>"')
 
-           net[d_node].cmd(f'ipfs name publish {cid}')
-
         # Change bootstrap node:
         #net[d_node].cmd('ipfs shutdown')
         net[d_node].cmd('ipfs bootstrap rm --all')
@@ -133,10 +131,13 @@ if (t_type == "ipfs"):
 
         docks[i-1].start()
         time.sleep(2)
+        if d_node == 'd1':
+           net[d_node].cmd(f'ipfs name publish {cid}')
 
+CLI(net)
 tadedime = datetime.datetime.now().strftime('%Y%b%d-%H:%M')
 f = open(f'./results/{tadedime}-{t_type}-{int(args.size)}.csv', "w")
-f.write("'node','type','filesize','server_delay','delay','bandwidth','sleep','real','user','sys'\n")
+f.write("'node','type','filesize','filecount','server_delay','delay','bandwidth','sleep','real','user','sys'\n")
 
 ### Sleep before tests.
 time.sleep(naptime)
@@ -147,9 +148,8 @@ def run_ipfs():
   for i in range(2, count+1):
       d_node = f'd{i}'
 
-
       #result = net[d_node].cmd(f'time -p ipfs get {cid} --output=/tmp/ipfs/data.txt; sync')
-      result = net[d_node].cmd(f'time -p ipfs get /ipns/{peerid} --output=/tmp/ipfs/; sync')
+      result = net[d_node].cmd(f'time -p ipfs get /ipns/{peerid} --output={ipfs_dir_location}; sync')
       info(f'*** Finished data retrieval via ipfs on node {d_node} \n')
 
       print(result)
@@ -161,7 +161,7 @@ def run_ipfs():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','ipfs','{int(args.size)}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','ipfs','{int(args.size)}','{file_count}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
 
 
 def run_http():
@@ -170,7 +170,11 @@ def run_http():
 
       d_node = f'd{i}'
 
-      result = net[d_node].cmd(f"time -p wget --ca-certificate=/etc/ssl/issuer.crt -q https://192.168.1.1/data.txt -P /tmp/http/data.txt; sync")
+#      result = net[d_node].cmd(f"time -p wget --ca-certificate=/etc/ssl/issuer.crt -q https://192.168.1.1/data.txt -P /tmp/http/data.txt; sync")
+#      result = net[d_node].cmd(f'time -p parallel -a <(seq 0 {file_count}) -P 4 --citation wget --ca-certificate=/etc/ssl/issuer.crt -q https://192.168.1.1/{1}.txt -P /tmp/http/{1}.txt; sync')
+      smile = "{1}"
+      parallelcmd = f'time -p parallel --will-cite -a <(seq 0 {file_count}) -j 4 wget -q --ca-certificate=/etc/ssl/issuer.crt https://192.168.1.1/{smile}.txt -P /tmp/http/{smile}.txt; sync'
+      result = net[d_node].cmd(parallelcmd)
       time.sleep(2)
       info(f'*** Finished data retrieval via http on node {d_node} \n')
 
@@ -181,7 +185,7 @@ def run_http():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','https','{int(args.size)}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
+      f.write(f"'d{i}','https','{int(args.size)}','{file_count}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
 
 if (t_type == "https"):
     info('*** Starting HTTPS benchmark run')
@@ -194,7 +198,7 @@ else:
 
 
 #info('*** Running CLI\n')
-#CLI(net)
+CLI(net)
 info('*** Finished tests!')
 info('*** Stopping network')
 

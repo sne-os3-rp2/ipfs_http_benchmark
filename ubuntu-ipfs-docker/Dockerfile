@@ -8,6 +8,8 @@ RUN cd ./go-ipfs && ./install.sh
 RUN apt-get update
 RUN apt-get install --assume-yes wget
 RUN apt-get install --assume-yes nginx
+RUN apt-get install --assume-yes parallel
+RUN mkdir /tmp/upload
 
 # Copy Nginx certificates after installation
 COPY ./self_cert/ /etc/ssl/
