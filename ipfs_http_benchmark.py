@@ -108,10 +108,13 @@ if (t_type == "ipfs"):
         net[d_node].cmd('ipfs init --profile=badgerds')
 
         if d_node == 'd1':
-           time.sleep(2)
+#           time.sleep(2)
            info('*** Adding generated data to ipfs\n')
            garbo = net[d_node].cmd('echo "ravioli"') # "flush" stdout on host
            #cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
+           time.sleep(2)
+           garbo = net[d_node].cmd('export A') # "flush" stdout on host
+           time.sleep(0.1)
            cid = net[d_node].cmd(f'ipfs add -Q -r {ipfs_dir_location}').rstrip()
 
            print(f"*** CID of data is {cid}")
@@ -134,7 +137,7 @@ if (t_type == "ipfs"):
         if d_node == 'd1':
            net[d_node].cmd(f'ipfs name publish {cid}')
 
-CLI(net)
+#CLI(net)
 tadedime = datetime.datetime.now().strftime('%Y%b%d-%H:%M')
 f = open(f'./results/{tadedime}-{t_type}-{int(args.size)}.csv', "w")
 f.write("'node','type','filesize','filecount','server_delay','delay','bandwidth','sleep','real','user','sys'\n")
@@ -198,7 +201,7 @@ else:
 
 
 #info('*** Running CLI\n')
-CLI(net)
+#CLI(net)
 info('*** Finished tests!')
 info('*** Stopping network')
 
