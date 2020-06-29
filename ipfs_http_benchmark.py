@@ -63,7 +63,9 @@ for i in range(1, count+1):
             "ENV_SWARM_KEY":"09b7fe038a241d5e38650b0f1811933644d6195814f863902d44698fa38b8cfa",
             "BOOTNODE_IP":"192.168.1.1",
             "IS_BOOTNODE":bootnode
-            }))
+            },
+        cpu_quota=40000, cpu_period=100000
+        ))
 
     if (i == 1):
        # linking node hosting download data to switch
@@ -113,25 +115,34 @@ if (t_type == "ipfs"):
            garbo = net[d_node].cmd('echo "ravioli"') # "flush" stdout on host
            #cid = net[d_node].cmd('ipfs add -Q /tmp/data.txt').rstrip()
            time.sleep(2)
-           garbo = net[d_node].cmd('export A') # "flush" stdout on host
+           garbo = net[d_node].cmd('echo "ravioli"') # "flush" stdout on host
            time.sleep(0.1)
            cid = net[d_node].cmd(f'ipfs add -Q -r {ipfs_dir_location}').rstrip()
 
            print(f"*** CID of data is {cid}")
-
-           peerid = net[d_node].cmd('ipfs id -f "<id>"')
+           
+           while peerid == None:
+               peerid = net[d_node].cmd('ipfs id -f "<id>"')
+               while ("failed" in peerid or "error" in peerid):
+                    peerid = net[d_node].cmd('ipfs id -f "<id>"')
 
         # Change bootstrap node:
         #net[d_node].cmd('ipfs shutdown')
         net[d_node].cmd('ipfs bootstrap rm --all')
-        time.sleep(3)
+        time.sleep(0.5)
         garbolo = net[d_node].cmd('echo "fermioli"') # used to filter out stdout from verbose errors
-        interm = net[d_node].cmd(f'ipfs bootstrap add /ip4/192.168.1.1/tcp/4001/p2p/{peerid}')
+        time.sleep(0.1)
+        garbolo = net[d_node].cmd('echo "fermioli"') # used to filter out stdout from verbose errors
+        interm = "failed"
+        while ("failed" in interm or "error" in interm):
+            interm = net[d_node].cmd(f'ipfs bootstrap add /ip4/192.168.1.1/tcp/4001/p2p/{peerid}')
         info(f'*** bootstrap command result: {interm}')
         net[d_node].cmd(f'echo "/key/swarm/psk/1.0.0/\n/base16/" > ~/.ipfs/swarm.key')
         net[d_node].cmd(f'echo $ENV_SWARM_KEY >> ~/.ipfs/swarm.key')
         info(f'*** PEERID after boot {peerid}')
 
+        ## DISABLE eth0 to enforce private network 
+        net[d_node].cmd(f'ip link set eth0 down')
         docks[i-1].start()
         time.sleep(2)
         if d_node == 'd1':
@@ -140,7 +151,7 @@ if (t_type == "ipfs"):
 #CLI(net)
 tadedime = datetime.datetime.now().strftime('%Y%b%d-%H:%M')
 f = open(f'./results/{tadedime}-{t_type}-{int(args.size)}.csv', "w")
-f.write("'node','type','filesize','filecount','server_delay','delay','bandwidth','sleep','real','user','sys'\n")
+f.write("node,type,filesize,filecount,server_delay,delay,bandwidth,sleep,real,user,sys\n")
 
 ### Sleep before tests.
 time.sleep(naptime)
@@ -153,7 +164,7 @@ def run_ipfs():
 
       #result = net[d_node].cmd(f'time -p ipfs get {cid} --output=/tmp/ipfs/data.txt; sync')
       result = net[d_node].cmd(f'time -p ipfs get /ipns/{peerid} --output={ipfs_dir_location}; sync')
-      info(f'*** Finished data retrieval via ipfs on node {d_node} \n')
+      #info(f'*** Finished data retrieval via ipfs on node {d_node} \n')
 
       print(result)
 
@@ -164,8 +175,9 @@ def run_ipfs():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','ipfs','{int(args.size)}','{file_count}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
-
+      f.write(f"d{i},ipfs,{int(args.size)},{file_count},{delay_server},{delay},{bw},{naptime},{real},{user},{sys}\n")
+      info(f'zzz.. {naptime}\n')
+      time.sleep(naptime)
 
 def run_http():
 
@@ -188,7 +200,8 @@ def run_http():
       real = splitted[length-4].split(" ")[1].rstrip()
       user = splitted[length-3].split(" ")[1].rstrip()
       sys  = splitted[length-2].split(" ")[1].rstrip()
-      f.write(f"'d{i}','https','{int(args.size)}','{file_count}','{delay_server}','{delay}','{bw}','{naptime}','{real}','{user}','{sys}'\n")
+      f.write(f"d{i},https,{int(args.size)},{file_count},{delay_server},{delay},{bw},{naptime},{real},{user},{sys}\n")
+
 
 if (t_type == "https"):
     info('*** Starting HTTPS benchmark run')
