@@ -16,6 +16,7 @@ parser.add_argument("-c", "--count", help="Number of nodes", default=1)
 parser.add_argument("-s", "--size", help="filesize in MiB; e.g. 10", default="10")
 parser.add_argument("-d", "--delay", help="delay between nodes and switch", default="50ms")
 parser.add_argument("-b", "--bandwidth", help="bandwidth between all nodes and switch", default=1000)
+parser.add_argument("-bs", "--bandwidth_server", help="bandwidth between the server and the switch", default=1000)
 parser.add_argument("-t", "--type", help="type of benchmark to run", default="https")
 parser.add_argument("-ds", "--delayserver", help="delay between node hosting data and switch", default="150ms")
 parser.add_argument("-n", "--naptime", help="Sleep time before test start. (may influence results)", default="10")
@@ -26,6 +27,7 @@ file_size = int(args.size) * 256 # Convert MiB to chunks of 4096 bytes
 delay = args.delay #General delay between all hosts
 delay_server = args.delayserver
 bw = int(args.bandwidth)
+bs = int(args.bandwidth_server)
 t_type = args.type
 naptime = int(args.naptime)
 file_count = int(args.file_count)
@@ -70,7 +72,7 @@ for i in range(1, count+1):
     if (i == 1):
        # linking node hosting download data to switch
        info(f'*** Linking node hosting download data (d1) to switch with delay of {delay} and bandwidth of {bw} \n')
-       net.addLink(s1, net[d_node], cls=TCLink, delay=delay_server, bw=bw)
+       net.addLink(s1, net[d_node], cls=TCLink, delay=delay_server, bw=bs)
 
        if (t_type == "https"): # Configure HTTPS server
             # starting ngnix on d1
